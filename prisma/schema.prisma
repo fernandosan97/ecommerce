@@ -1,0 +1,97 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  price       Decimal  @db.Decimal(10, 2)
+  sku         String   @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  stock              Stock?              @relation("ProductStock")
+  invoiceItems       InvoiceItem[]
+  inventoryMovements InventoryMovement[] @relation("ProductMovements")
+}
+
+model Stock {
+  id        String   @id @default(uuid())
+  productId String   @unique
+  quantity  Int      @default(0) // Stock disponible (calculado desde movimientos)
+  reserved  Int      @default(0) // Cantidad reservada en proceso de compra
+  version   Int      @default(0) // Para control de concurrencia optimista
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product Product @relation("ProductStock", fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model InventoryMovement {
+  id            String                @id @default(uuid())
+  productId     String
+  type          InventoryMovementType
+  quantity      Int // Positivo para entradas, negativo para salidas
+  referenceId   String? // ID de referencia (invoiceId, etc.)
+  referenceType String? // Tipo de referencia (INVOICE, MANUAL_ADJUSTMENT, etc.)
+  description   String?
+  createdAt     DateTime              @default(now())
+  createdBy     String? // Usuario o sistema que creó el movimiento
+
+  product Product @relation("ProductMovements", fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([createdAt])
+  @@index([type])
+  @@index([referenceId])
+}
+
+enum InventoryMovementType {
+  ENTRY // Entrada de stock (compra, recepción) - quantity positivo
+  EXIT // Salida de stock (venta, consumo) - quantity negativo
+  ADJUSTMENT // Ajuste manual de inventario - quantity puede ser positivo o negativo
+}
+
+model Invoice {
+  id            String        @id @default(uuid())
+  invoiceNumber String        @unique
+  total         Decimal       @db.Decimal(10, 2)
+  status        InvoiceStatus @default(PENDING)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  items InvoiceItem[]
+}
+
+enum InvoiceStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+model InvoiceItem {
+  id        String   @id @default(uuid())
+  invoiceId String
+  productId String
+  quantity  Int
+  unitPrice Decimal  @db.Decimal(10, 2)
+  subtotal  Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([invoiceId])
+  @@index([productId])
+}
