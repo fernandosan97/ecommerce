@@ -65,95 +65,339 @@ El servidor estará disponible en `http://localhost:3000`
 #### GET `/api/products`
 Obtiene todos los productos con su stock.
 
-**Respuesta:**
+**Parámetros:** Ninguno
+
+**Respuesta exitosa (200):**
 ```json
 [
   {
     "id": "uuid",
     "name": "Producto 1",
-    "description": "Descripción",
+    "description": "Descripción del producto",
     "price": "99.99",
     "sku": "SKU001",
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2024-01-01T00:00:00.000Z",
     "stock": {
       "id": "uuid",
       "productId": "uuid",
       "quantity": 100,
-      "reserved": 0
+      "reserved": 0,
+      "version": 0,
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
     }
   }
 ]
 ```
 
+---
+
 #### GET `/api/products/:id`
 Obtiene un producto específico por ID.
+
+**Parámetros de URL:**
+- `id` (string, requerido): UUID del producto
+
+**Respuesta exitosa (200):**
+```json
+{
+  "id": "uuid",
+  "name": "Producto 1",
+  "description": "Descripción del producto",
+  "price": "99.99",
+  "sku": "SKU001",
+  "createdAt": "2024-01-01T00:00:00.000Z",
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "stock": {
+    "id": "uuid",
+    "productId": "uuid",
+    "quantity": 100,
+    "reserved": 0,
+    "version": 0
+  }
+}
+```
+
+**Errores posibles:**
+- `404`: Producto no encontrado
+
+---
 
 #### POST `/api/products`
 Crea un nuevo producto.
 
-**Body:**
+**Body (JSON):**
 ```json
 {
-  "name": "Producto 1",
-  "description": "Descripción del producto",
-  "price": 99.99,
-  "sku": "SKU001",
-  "initialStock": 100
+  "name": "Producto 1",              // requerido
+  "description": "Descripción",      // opcional
+  "price": 99.99,                     // requerido
+  "sku": "SKU001",                   // requerido, debe ser único
+  "initialStock": 100                 // opcional, crea movimiento ENTRY si se proporciona
 }
 ```
+
+**Respuesta exitosa (201):**
+```json
+{
+  "id": "uuid",
+  "name": "Producto 1",
+  "description": "Descripción",
+  "price": "99.99",
+  "sku": "SKU001",
+  "createdAt": "2024-01-01T00:00:00.000Z",
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "stock": {
+    "id": "uuid",
+    "productId": "uuid",
+    "quantity": 100,
+    "reserved": 0
+  }
+}
+```
+
+**Errores posibles:**
+- `400`: Datos incompletos (falta name, price o sku)
+- `409`: SKU duplicado
+
+---
 
 #### PUT `/api/products/:id`
 Actualiza un producto existente.
 
+**Parámetros de URL:**
+- `id` (string, requerido): UUID del producto
+
+**Body (JSON):**
+```json
+{
+  "name": "Producto Actualizado",    // opcional
+  "description": "Nueva descripción", // opcional
+  "price": 149.99                     // opcional
+}
+```
+
+**Respuesta exitosa (200):**
+```json
+{
+  "id": "uuid",
+  "name": "Producto Actualizado",
+  "description": "Nueva descripción",
+  "price": "149.99",
+  "sku": "SKU001",
+  "stock": {
+    "id": "uuid",
+    "productId": "uuid",
+    "quantity": 100,
+    "reserved": 0
+  }
+}
+```
+
+**Errores posibles:**
+- `404`: Producto no encontrado
+
+---
+
 #### DELETE `/api/products/:id`
 Elimina un producto.
 
-#### PUT `/api/products/:productId/stock`
-Actualiza el stock de un producto.
+**Parámetros de URL:**
+- `id` (string, requerido): UUID del producto
 
-**Body:**
+**Respuesta exitosa (204):** Sin contenido
+
+**Errores posibles:**
+- `404`: Producto no encontrado
+
+---
+
+#### POST `/api/products/:productId/stock/add`
+Agrega stock a un producto (entrada de inventario).
+
+**Parámetros de URL:**
+- `productId` (string, requerido): UUID del producto
+
+**Body (JSON):**
 ```json
 {
-  "quantity": 150
+  "quantity": 50,                     // requerido, debe ser > 0
+  "description": "Compra de proveedor" // opcional
 }
 ```
+
+**Respuesta exitosa (200):**
+```json
+{
+  "id": "uuid",
+  "name": "Producto 1",
+  "price": "99.99",
+  "sku": "SKU001",
+  "stock": {
+    "id": "uuid",
+    "productId": "uuid",
+    "quantity": 150,
+    "reserved": 0,
+    "available": 150
+  }
+}
+```
+
+**Errores posibles:**
+- `400`: Cantidad inválida (debe ser > 0)
+- `404`: Producto no encontrado
+
+---
+
+#### POST `/api/products/:productId/stock/adjust`
+Ajusta el stock de un producto (puede ser positivo o negativo).
+
+**Parámetros de URL:**
+- `productId` (string, requerido): UUID del producto
+
+**Body (JSON):**
+```json
+{
+  "quantity": -10,                    // requerido, puede ser positivo o negativo (no puede ser 0)
+  "description": "Ajuste por pérdida" // opcional
+}
+```
+
+**Nota:** Si `quantity` es negativo, debe haber suficiente stock disponible.
+
+**Respuesta exitosa (200):**
+```json
+{
+  "id": "uuid",
+  "name": "Producto 1",
+  "price": "99.99",
+  "sku": "SKU001",
+  "stock": {
+    "id": "uuid",
+    "productId": "uuid",
+    "quantity": 140,
+    "reserved": 0,
+    "available": 140
+  }
+}
+```
+
+**Errores posibles:**
+- `400`: Cantidad inválida (debe ser diferente de 0) o stock insuficiente
+- `404`: Producto no encontrado
+
+---
+
+#### GET `/api/products/:productId/movements`
+Obtiene el historial de movimientos de inventario de un producto.
+
+**Parámetros de URL:**
+- `productId` (string, requerido): UUID del producto
+
+**Query Parameters:**
+- `type` (string, opcional): Filtrar por tipo de movimiento (`ENTRY`, `EXIT`, `ADJUSTMENT`)
+- `limit` (number, opcional): Número máximo de resultados (default: 100)
+- `offset` (number, opcional): Número de resultados a saltar (default: 0)
+
+**Ejemplo:**
+```
+GET /api/products/uuid/movements?type=ENTRY&limit=50&offset=0
+```
+
+**Respuesta exitosa (200):**
+```json
+[
+  {
+    "id": "uuid",
+    "productId": "uuid",
+    "type": "ENTRY",
+    "quantity": 100,
+    "referenceId": null,
+    "referenceType": "INITIAL_STOCK",
+    "description": "Stock inicial del producto",
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "createdBy": null
+  },
+  {
+    "id": "uuid",
+    "productId": "uuid",
+    "type": "EXIT",
+    "quantity": -20,
+    "referenceId": "invoice-uuid",
+    "referenceType": "INVOICE",
+    "description": "Venta confirmada - Factura INV-00000001",
+    "createdAt": "2024-01-02T00:00:00.000Z",
+    "createdBy": null
+  }
+]
+```
+
+**Errores posibles:**
+- `404`: Producto no encontrado
 
 ### Facturas
 
 #### GET `/api/invoices`
 Obtiene todas las facturas con sus items.
 
+**Parámetros:** Ninguno
+
+**Respuesta exitosa (200):**
+```json
+[
+  {
+    "id": "uuid",
+    "invoiceNumber": "INV-00000001",
+    "total": "299.97",
+    "status": "CONFIRMED",
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2024-01-01T00:00:00.000Z",
+    "items": [
+      {
+        "id": "uuid",
+        "invoiceId": "uuid",
+        "productId": "uuid",
+        "quantity": 2,
+        "unitPrice": "99.99",
+        "subtotal": "199.98",
+        "createdAt": "2024-01-01T00:00:00.000Z",
+        "product": {
+          "id": "uuid",
+          "name": "Producto 1",
+          "price": "99.99",
+          "stock": {
+            "quantity": 98,
+            "reserved": 0
+          }
+        }
+      }
+    ]
+  }
+]
+```
+
+---
+
 #### GET `/api/invoices/:id`
 Obtiene una factura específica por ID.
 
-#### POST `/api/invoices`
-Crea una nueva factura con **bloqueo pesimista** (por defecto).
+**Parámetros de URL:**
+- `id` (string, requerido): UUID de la factura
 
-**Body:**
-```json
-{
-  "items": [
-    {
-      "productId": "uuid-del-producto-1",
-      "quantity": 2
-    },
-    {
-      "productId": "uuid-del-producto-2",
-      "quantity": 1
-    }
-  ]
-}
-```
-
-**Respuesta exitosa:**
+**Respuesta exitosa (200):**
 ```json
 {
   "id": "uuid",
   "invoiceNumber": "INV-00000001",
   "total": "299.97",
   "status": "CONFIRMED",
+  "createdAt": "2024-01-01T00:00:00.000Z",
+  "updatedAt": "2024-01-01T00:00:00.000Z",
   "items": [
     {
       "id": "uuid",
+      "invoiceId": "uuid",
       "productId": "uuid",
       "quantity": 2,
       "unitPrice": "99.99",
@@ -161,7 +405,11 @@ Crea una nueva factura con **bloqueo pesimista** (por defecto).
       "product": {
         "id": "uuid",
         "name": "Producto 1",
-        "price": "99.99"
+        "price": "99.99",
+        "stock": {
+          "quantity": 98,
+          "reserved": 0
+        }
       }
     }
   ]
@@ -169,24 +417,171 @@ Crea una nueva factura con **bloqueo pesimista** (por defecto).
 ```
 
 **Errores posibles:**
-- `400`: Stock insuficiente
+- `404`: Factura no encontrada
+
+---
+
+#### POST `/api/invoices`
+Crea una nueva factura con **bloqueo pesimista** (por defecto).
+
+**Body (JSON):**
+```json
+{
+  "items": [                          // requerido, array con al menos un item
+    {
+      "productId": "uuid-producto-1", // requerido
+      "quantity": 2                    // requerido, debe ser > 0
+    },
+    {
+      "productId": "uuid-producto-2",
+      "quantity": 1
+    }
+  ]
+}
+```
+
+**Respuesta exitosa (201):**
+```json
+{
+  "id": "uuid",
+  "invoiceNumber": "INV-00000001",
+  "total": "299.97",
+  "status": "CONFIRMED",
+  "createdAt": "2024-01-01T00:00:00.000Z",
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "items": [
+    {
+      "id": "uuid",
+      "invoiceId": "uuid",
+      "productId": "uuid",
+      "quantity": 2,
+      "unitPrice": "99.99",
+      "subtotal": "199.98",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "product": {
+        "id": "uuid",
+        "name": "Producto 1",
+        "price": "99.99",
+        "stock": {
+          "quantity": 98,
+          "reserved": 0
+        }
+      }
+    }
+  ]
+}
+```
+
+**Errores posibles:**
+- `400`: Datos inválidos (items vacío, productId o quantity faltante/inválido) o stock insuficiente
 - `409`: Error de concurrencia después de múltiples reintentos (muy raro)
+
+**Nota:** Este endpoint usa bloqueo pesimista. El sistema reintenta automáticamente durante hasta 10 segundos si hay conflictos de concurrencia.
+
+---
 
 #### POST `/api/invoices/optimistic`
 Crea una nueva factura con **bloqueo optimista**.
 
-**Body:** (igual que el endpoint anterior)
+**Body (JSON):**
+```json
+{
+  "items": [                          // requerido, array con al menos un item
+    {
+      "productId": "uuid-producto-1", // requerido
+      "quantity": 2                    // requerido, debe ser > 0
+    },
+    {
+      "productId": "uuid-producto-2",
+      "quantity": 1
+    }
+  ]
+}
+```
 
-**Respuesta:** (igual que el endpoint anterior)
+**Respuesta exitosa (201):**
+```json
+{
+  "id": "uuid",
+  "invoiceNumber": "INV-00000001",
+  "total": "299.97",
+  "status": "CONFIRMED",
+  "createdAt": "2024-01-01T00:00:00.000Z",
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "items": [
+    {
+      "id": "uuid",
+      "invoiceId": "uuid",
+      "productId": "uuid",
+      "quantity": 2,
+      "unitPrice": "99.99",
+      "subtotal": "199.98",
+      "product": {
+        "id": "uuid",
+        "name": "Producto 1",
+        "price": "99.99",
+        "stock": {
+          "quantity": 98,
+          "reserved": 0
+        }
+      }
+    }
+  ]
+}
+```
 
 **Errores posibles:**
-- `400`: Stock insuficiente
+- `400`: Datos inválidos (items vacío, productId o quantity faltante/inválido) o stock insuficiente
 - `409`: Error de concurrencia después de múltiples reintentos (muy raro)
 
-**Nota:** Este endpoint usa bloqueo optimista en lugar de pesimista. Ver sección "Bloqueo Pesimista vs Optimista" para más detalles.
+**Nota:** Este endpoint usa bloqueo optimista. Ver sección "Bloqueo Pesimista vs Optimista" para más detalles. Recomendado por defecto para mejor rendimiento.
+
+---
 
 #### PUT `/api/invoices/:id/cancel`
-Cancela una factura y devuelve el stock.
+Cancela una factura y devuelve el stock al inventario.
+
+**Parámetros de URL:**
+- `id` (string, requerido): UUID de la factura
+
+**Body:** Ninguno
+
+**Respuesta exitosa (200):**
+```json
+{
+  "id": "uuid",
+  "invoiceNumber": "INV-00000001",
+  "total": "299.97",
+  "status": "CANCELLED",
+  "createdAt": "2024-01-01T00:00:00.000Z",
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "items": [
+    {
+      "id": "uuid",
+      "invoiceId": "uuid",
+      "productId": "uuid",
+      "quantity": 2,
+      "unitPrice": "99.99",
+      "subtotal": "199.98",
+      "product": {
+        "id": "uuid",
+        "name": "Producto 1",
+        "price": "99.99",
+        "stock": {
+          "quantity": 100,
+          "reserved": 0
+        }
+      }
+    }
+  ]
+}
+```
+
+**Errores posibles:**
+- `404`: Factura no encontrada
+- `400`: La factura ya está cancelada
+
+**Nota:** Al cancelar una factura, se crea un movimiento `ENTRY` para cada item, devolviendo el stock al inventario.
 
 ## Control de Concurrencia
 
